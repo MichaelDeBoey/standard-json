@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { toJsonSchema } from "~/index.js";
 
+import { coldToJsonSchema } from "./cold.js";
+
 // `sury` 10 is the one installed as `sury`, so the handler is given 11.x.
 vi.mock("sury", () => import("sury-11"));
 
@@ -69,6 +71,28 @@ describe("sury 11", () => {
 
     expect(toJsonSchema.sync(schema, { io: "output" })).toMatchObject({
       properties: { quantity: { type: "number" } },
+    });
+  });
+
+  it("falls back to the handler until S.enableStandardJSONSchema() is called", async () => {
+    const toJsonSchema = await coldToJsonSchema();
+    const schema = S.schema({ quantity: S.number });
+
+    // Only the async entry can load the handler to fall back to.
+    expect(() => toJsonSchema.sync(schema)).toThrow(
+      expect.objectContaining({
+        cause: expect.objectContaining({
+          message: expect.stringContaining(
+            "requires S.enableStandardJSONSchema() to be called first",
+          ),
+        }),
+        message: 'standard-json: Unsupported schema vendor "sury".',
+      }),
+    );
+    expect(await toJsonSchema(schema)).toEqual({
+      properties: { quantity: { type: "number" } },
+      required: ["quantity"],
+      type: "object",
     });
   });
 });

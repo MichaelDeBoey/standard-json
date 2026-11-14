@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { toJsonSchema } from "~/index.js";
 
+import { coldToJsonSchema } from "./cold.js";
+
 type Convertible = Parameters<typeof toJsonSchema>[0];
 
 const withoutDialect = ({
@@ -114,6 +116,80 @@ describe("effect 4", () => {
 
       expect(await convertSide(Count, "input")).toMatchObject(name);
       expect(await convertSide(Count, "output")).toMatchObject(quantity);
+    });
+  });
+
+  describe("with toStandardJSONSchemaV1", () => {
+    const Tag = Schema.String.annotate({ identifier: "Tag" });
+    // It carries Standard JSON Schema without `validate`, so its type isn't
+    // a Standard Schema.
+    const schema = Schema.toStandardJSONSchemaV1(
+      Schema.Struct({ tags: Schema.Array(Tag) }),
+    ) as unknown as Convertible;
+
+    it.each([
+      ["without a target", {}],
+      ["for the draft-2020-12 target", { target: "draft-2020-12" }],
+    ])(
+      "converts through its own converter to draft 2020-12 %s, before the handler is loaded",
+      async (_, options) => {
+        const toJsonSchema = await coldToJsonSchema();
+        const jsonSchema = {
+          $defs: { Tag: { type: "string" } },
+          additionalProperties: true,
+          properties: {
+            tags: { items: { $ref: "#/$defs/Tag" }, type: "array" },
+          },
+          required: ["tags"],
+          type: "object",
+        };
+
+        expect(toJsonSchema.sync(schema, options)).toEqual(jsonSchema);
+        expect(await toJsonSchema(schema, options)).toEqual(jsonSchema);
+      },
+    );
+
+    it("falls back to the handler for a target its converter doesn't support", async () => {
+      const toJsonSchema = await coldToJsonSchema();
+      const options = { target: "openapi-3.0" };
+
+      // Only the async entry can load the handler to fall back to.
+      expect(() => toJsonSchema.sync(schema, options)).toThrow(
+        expect.objectContaining({
+          cause: expect.objectContaining({
+            message: "Unsupported target: openapi-3.0",
+          }),
+          message: 'standard-json: Unsupported schema vendor "effect".',
+        }),
+      );
+
+      const jsonSchema = {
+        $schema: "http://json-schema.org/draft-07/schema#",
+        additionalProperties: true,
+        definitions: { Tag: { type: "string" } },
+        properties: {
+          tags: { items: { $ref: "#/definitions/Tag" }, type: "array" },
+        },
+        required: ["tags"],
+        type: "object",
+      };
+      expect(await toJsonSchema(schema, options)).toEqual(jsonSchema);
+      expect(toJsonSchema.sync(schema, options)).toEqual(jsonSchema);
+    });
+  });
+
+  it("converts a schema from toStandardSchemaV1, which carries no converter, through the handler", async () => {
+    const toJsonSchema = await coldToJsonSchema();
+    const schema = Schema.toStandardSchemaV1(
+      Schema.Struct({ name: Schema.String }),
+    );
+
+    expect(() => toJsonSchema.sync(schema)).toThrow(
+      'standard-json: Unsupported schema vendor "effect".',
+    );
+    expect(await toJsonSchema(schema)).toMatchObject({
+      $schema: "http://json-schema.org/draft-07/schema#",
+      properties: { name: { type: "string" } },
     });
   });
 });

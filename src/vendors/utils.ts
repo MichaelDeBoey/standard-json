@@ -14,8 +14,8 @@ export const ioOf = (options?: Record<string, unknown>) =>
   options?.io === "input" || options?.io === "output" ? options.io : undefined;
 
 export class UnsupportedVendorError extends Error {
-  constructor(vendor: string) {
-    super(`standard-json: Unsupported schema vendor "${vendor}".`);
+  constructor(vendor: string, options?: ErrorOptions) {
+    super(`standard-json: Unsupported schema vendor "${vendor}".`, options);
   }
 }
 

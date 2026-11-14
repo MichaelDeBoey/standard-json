@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, it } from "vitest";
 import { z } from "zod/v4";
 
-import { toJsonSchema } from "~/index.js";
+import { loadVendor, toJsonSchema } from "~/index.js";
 
 // A schema from a library standard-json does not know, carrying Standard
 // JSON Schema (https://standardschema.dev/json-schema) on `~standard`: its
@@ -143,10 +143,10 @@ describe("standard json schema", () => {
     );
   });
 
-  it("leaves a built-in vendor to its handler, cold and warm", async () => {
+  it("converts a built-in vendor's schema through the converter it carries, cold and warm", async () => {
     // A real zod schema given a `jsonSchema` of its own that answers
-    // differently from zod's handler. The handler must win on every entry,
-    // whether or not the async one has loaded it yet.
+    // differently from zod's handler. The converter must win on every entry,
+    // whether or not the async one has loaded the handler yet.
     const schema = z.object({ quantity: z.number().default(1) });
     const carried = {
       ...schema["~standard"],
@@ -157,19 +157,44 @@ describe("standard json schema", () => {
     };
     Object.defineProperty(schema, "~standard", { value: carried });
 
-    // Cold: the handler is not loaded, and the carried schema is not a
-    // substitute for it.
-    expect(() => toJsonSchema.sync(schema)).toThrow(
-      'Unsupported schema vendor "zod"',
+    // Cold: the converter needs no handler.
+    expect(toJsonSchema.sync(schema)).toEqual({ $comment: "carried" });
+
+    // Warm: a schema that carries no converter loads the handler, which the
+    // one that does still doesn't use.
+    await toJsonSchema(z.object({ quantity: z.number() }));
+    expect(await toJsonSchema(schema)).toEqual({ $comment: "carried" });
+    expect(toJsonSchema.sync(schema)).toEqual({ $comment: "carried" });
+  });
+
+  it("throws the converter's error for a vendor without a handler, async and sync", async () => {
+    const unsupported = new Error("Unsupported target: draft-04");
+    const throwUnsupported = () => {
+      throw unsupported;
+    };
+    const schema = {
+      "~standard": {
+        jsonSchema: { input: throwUnsupported, output: throwUnsupported },
+        validate: (value: unknown) => ({ value }),
+        vendor: "example-without-handler",
+        version: 1,
+      },
+    } as unknown as StandardSchemaV1;
+
+    await expect(toJsonSchema(schema, { target: "draft-04" })).rejects.toBe(
+      unsupported,
     );
+    expect(() => toJsonSchema.sync(schema, { target: "draft-04" })).toThrow(
+      unsupported,
+    );
+  });
 
-    const fromHandler = await toJsonSchema(schema);
-    expect(fromHandler).not.toHaveProperty("$comment");
-    expect(fromHandler).toMatchObject({
-      properties: { quantity: { type: "number", default: 1 } },
-    });
+  it("lets a handler registered with loadVendor win over the converter a schema carries, async and sync", async () => {
+    const { schema, calls } = ownSchema();
+    loadVendor("example-with-json-schema", () => ({ $comment: "registered" }));
 
-    // Warm: the same answer from the sync entry.
-    expect(toJsonSchema.sync(schema)).toEqual(fromHandler);
+    expect(await toJsonSchema(schema)).toEqual({ $comment: "registered" });
+    expect(toJsonSchema.sync(schema)).toEqual({ $comment: "registered" });
+    expect(calls).toEqual([]);
   });
 });

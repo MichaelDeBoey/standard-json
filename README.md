@@ -47,7 +47,11 @@ Without `io`, every vendor converts the input, except that `effect` 3 converts a
 
 ### A schema that carries its own JSON Schema
 
-A schema from a library that is not on the built-in list converts as well when it carries [Standard JSON Schema](https://standardschema.dev/json-schema), the `jsonSchema` member of `~standard`: `toJsonSchema` calls its `input()`, or `output()` when `io` says so, with the `target` from the options (`draft-2020-12` when none is given). The other options, without `io` and `target`, reach it as `libraryOptions`, which is `undefined` when there are none. A built-in vendor or a handler registered with `loadVendor` still takes precedence.
+A schema that carries [Standard JSON Schema](https://standardschema.dev/json-schema), the `jsonSchema` member of `~standard`, converts through it, whether or not its library is on the built-in list: `toJsonSchema` calls its `input()`, or `output()` when `io` says so, with the `target` from the options (`draft-2020-12` when none is given). The other options, without `io` and `target`, reach it as `libraryOptions`, which is `undefined` when there are none. A handler registered with `loadVendor` still takes precedence.
+
+The built-in handler is the fallback, for a schema that carries no `jsonSchema` and for one whose `input()` or `output()` throws, as it does for a target the library doesn't support. When the handler throws as well, its error has the converter's as `cause`. `toJsonSchema.sync` can't load the handler, so without a loaded one it throws, with the converter's error as `cause`.
+
+Some libraries carry it only when asked to: Effect v4 for a schema wrapped in `Schema.toStandardJSONSchemaV1`, Sury v11 once `S.enableStandardJSONSchema()` is called, and Valibot for a schema wrapped in `toStandardJsonSchema` from `@valibot/to-json-schema`.
 
 ### Sync Usage
 

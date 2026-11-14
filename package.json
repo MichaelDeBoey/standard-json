@@ -86,14 +86,17 @@
   "devDependencies": {
     "@biomejs/biome": "^2.0.4",
     "@types/node": "^24.3.1",
+    "arktype-2.2": "npm:arktype@^2.2.0",
     "effect-4": "npm:effect@^4.0.0",
     "pkgroll": "^2.29.0",
     "sury-11": "npm:sury@^11.0.0",
     "typebox-1.2": "npm:typebox@~1.2.0",
     "typebox-1.3": "npm:typebox@^1.3.0",
     "typescript": "^5.8.3",
+    "valibot-to-json-schema-1.8": "npm:@valibot/to-json-schema@^1.8.0",
     "vite": "^6.4.4",
-    "vitest": "^4.1.12"
+    "vitest": "^4.1.12",
+    "zod-4": "npm:zod@^4.0.0"
   },
   "pnpm": {
     "overrides": {

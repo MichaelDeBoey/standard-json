@@ -8,6 +8,8 @@ import { describe, expect, it } from "vitest";
 
 import { toJsonSchema } from "~/index.js";
 
+import { coldToJsonSchema } from "./cold.js";
+
 const schema = Type.Object(
   {
     myString: Type.String(),
@@ -74,5 +76,11 @@ describe("typebox 1.0.28 and later", () => {
 
   it("typebox through its Standard Schema adapter", async () => {
     expect(await toJsonSchema(toStandardSchema(schema))).toEqual(jsonSchema);
+  });
+
+  it("typebox through its Standard Schema adapter synchronously, before the handler is loaded", async () => {
+    const toJsonSchema = await coldToJsonSchema();
+
+    expect(toJsonSchema.sync(toStandardSchema(schema))).toEqual(jsonSchema);
   });
 });
